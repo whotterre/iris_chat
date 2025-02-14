@@ -15,7 +15,6 @@ IrisChat is a real-time, anonymous chat application that pairs users randomly fo
 - **Backend**: Go (Gorilla WebSocket)
 - **Frontend**: React + Tailwind CSS
 - **Real-Time Communication**: WebSockets
-- **Deployment**: Docker, Kubernetes (optional)
 
 ## Getting Started
 
@@ -23,7 +22,6 @@ IrisChat is a real-time, anonymous chat application that pairs users randomly fo
 
 - Go (v1.20 or higher)
 - Node.js (v16 or higher) for the frontend
-- Docker (optional, for containerization)
 
 ### Installation
 
