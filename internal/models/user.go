@@ -15,7 +15,7 @@ const (
 )
 
 type User struct {
-	ID     uuid.UUID
+	ID    string
 	Conn   *websocket.Conn
 	Status UserStatus
 	RoomID	string
@@ -24,7 +24,7 @@ type User struct {
 
 func NewUser(conn *websocket.Conn) *User {
 	return &User{
-		ID: uuid.New(),
+		ID: uuid.NewString(),
 		Conn: conn,
 		Status: StatusWaiting,
 		RoomID: "",
