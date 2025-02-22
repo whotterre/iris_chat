@@ -9,7 +9,7 @@ import (
 func main() {
 	// Routes
 	http.HandleFunc("/ws", handlers.HandleWebSocket)
-
+	addr := "0.0.0.0:4000"
 	fmt.Println("Server started on :4000")
-	http.ListenAndServe(":4000", nil)
+	http.ListenAndServe(addr, nil)
 }

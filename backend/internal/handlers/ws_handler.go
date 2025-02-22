@@ -99,6 +99,18 @@ func listenForMessages(user *models.User, room *models.Room) {
 			removeUserFromRoom(user.ID)
 			break
 		}
+		
+		var messageData map[string]string
+		if err := json.Unmarshal(msg, &messageData); err != nil {
+			fmt.Println("[ERROR] Failed to parse message:", err)
+			continue
+		}
+
+		if messageData["type"] == "leave" {
+			removeUserFromRoom(user.ID)
+			user.Conn.Close()
+			break
+		}
 
 		fmt.Println("[MESSAGE RECEIVED] From:", user.ID, "Message:", string(msg))
 		broadcastMessage(room, user.ID, msg)
