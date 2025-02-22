@@ -1,6 +1,6 @@
 # IrisChat
 
-IrisChat is a real-time, anonymous chat application that pairs users randomly for text-based conversations. I wanted to create something Omegle-like to learn more about WebSockets and build a project that isn't heavily dependent on databases. For now, I'm focusing on the backend. Built with Go (Gorilla WebSocket) and React, it provides a seamless and secure chatting experience.
+IrisChat is a real-time, anonymous chat application that pairs users randomly for text-based conversations. I wanted to create something Omegle-like to learn more about WebSockets and build a project that isn't heavily dependent on databases. For now, I'm focusing on the backend. Built with Go (Gorilla WebSocket), it provides a seamless and secure chatting experience.
 
 ## Features
 
@@ -13,7 +13,6 @@ IrisChat is a real-time, anonymous chat application that pairs users randomly fo
 ## Tech Stack
 
 - **Backend**: Go (Gorilla WebSocket)
-- **Frontend**: React + Tailwind CSS
 - **Real-Time Communication**: WebSockets
 
 ## Getting Started
@@ -21,7 +20,6 @@ IrisChat is a real-time, anonymous chat application that pairs users randomly fo
 ### Prerequisites
 
 - Go (v1.20 or higher)
-- Node.js (v16 or higher) for the frontend
 
 ### Installation
 
@@ -42,7 +40,7 @@ IrisChat is a real-time, anonymous chat application that pairs users randomly fo
      ```
    - Start the server:
      ```bash
-     go run cmd/server/main.go
+     go run cmd/main.go
      ```
 
 3. **Set Up the Frontend**:
@@ -80,20 +78,21 @@ irischat/
 │   ├── cmd/               # Entry point for the server
 │   ├── internal/          # Application logic
 │   │   ├── handlers/      # HTTP and WebSocket handlers
-│   │   ├── models/        # Data models (e.g., User, Lobby)
-│   │   └── lobby/         # Lobby management logic
+│   │   ├── models/        # Data models (e.g., User, Message, Lobby, Room)
+│   │     
 │   └── go.mod             # Go module file
-├── frontend/              # Frontend (React + Tailwind CSS)
-│   ├── public/            # Static assets
-│   ├── src/               # React components and logic
-│   └── package.json       # Node.js dependencies
+├── frontend/              # Frontend (Vanilla HTML + CSS + JavaScript)
+│   ├── assets/            # Static assets
+│   ├── index.html         
+│   |── style.css
+    └── script.js           
 ├── docker-compose.yml     # Docker Compose configuration
 └── README.md              # Project documentation
 ```
 
 ## API Endpoints
 
-- **WebSocket**: `ws://localhost:8080/ws`
+- **WebSocket**: `ws://localhost:4000/ws`
   - Handles real-time communication between users.
 
 - **Health Check**: `GET /health`
@@ -119,7 +118,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Acknowledgments
 
 - [Gorilla WebSocket](https://github.com/gorilla/websocket) for WebSocket support.
-- [React](https://reactjs.org/) and [Tailwind CSS](https://tailwindcss.com/) for the frontend.
 
 ---
 
@@ -127,5 +125,3 @@ Made with ❤️ by [Iwegbu Jeddy](https://github.com/your-username)
 ```
 
 ---
-
-You can now copy this entire block and paste it into your `README.md` file. Let me know if you need further adjustments! 🚀
