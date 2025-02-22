@@ -23,14 +23,13 @@ var (
 	}
 )
 
-// HandleWebSocket manages everything: user connections, room creation, and messaging
+// HandleWebSocket manages user connections, room creation, and messaging
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, "Failed to upgrade connection", http.StatusInternalServerError)
 		return
 	}
-	defer conn.Close()
 
 	// Generate a unique user ID
 	userID := uuid.New().String()
@@ -41,38 +40,30 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	lobby.Mutex.Lock()
 	lobby.WaitingUsers = append(lobby.WaitingUsers, user)
-	room := assignRoom() // Now this function will wait for a second user
+	room := assignRoom()
 	lobby.Mutex.Unlock()
 
-	initialMsg := map[string]string{
-		"sender": "Server",
-	}
-
-	if room == nil {
-		initialMsg["message"] = "Waiting for another user..."
-	} else {
-		initialMsg["message"] = fmt.Sprintf("Connected as %s in room %s", userID, room.ID)
-	}
-
-	jsonMsg, _ := json.Marshal(initialMsg)
-	conn.WriteMessage(websocket.TextMessage, jsonMsg)
-
-	// Notify users in the room
-	for _, u := range room.Users {
-		u.Conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("You are in room %s", room.ID)))
-	}
-
-	// Handle incoming messages
-	for {
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			fmt.Println("[DISCONNECT] User disconnected:", userID, "Error:", err)
-			removeUserFromRoom(userID)
-			break
+	// Notify the user of their status
+	if room == nil || room.ID == "waiting" {
+		initialMsg := map[string]string{
+			"sender":  "Server",
+			"message": "Waiting for another user...",
 		}
-		fmt.Println("[MESSAGE RECEIVED] From:", userID, "Message:", string(msg))
+		jsonMsg, _ := json.Marshal(initialMsg)
+		conn.WriteMessage(websocket.TextMessage, jsonMsg)
+	} else {
+		// Notify both users in the room
+		for _, u := range room.Users {
+			msg := map[string]string{
+				"sender":  "Server",
+				"message": fmt.Sprintf("Connected to room %s", room.ID),
+			}
+			jsonMsg, _ := json.Marshal(msg)
+			u.Conn.WriteMessage(websocket.TextMessage, jsonMsg)
 
-		broadcastMessage(room, userID, msg)
+			// Start listening for messages from each user in their own goroutine
+			go listenForMessages(u, room)
+		}
 	}
 }
 
@@ -89,15 +80,29 @@ func assignRoom() *models.Room {
 		}
 
 		lobby.Rooms[roomID] = room
-		fmt.Print(len(lobby.WaitingUsers))
 		lobby.WaitingUsers = lobby.WaitingUsers[2:]
 
-		fmt.Println("Room created:", roomID)
+		fmt.Println("[ROOM CREATED]", roomID)
 		return room
 	}
 
-	// If no room yet, return a placeholder (won't be used until a second user joins)
+	// No available pair yet, user must wait
 	return &models.Room{ID: "waiting"}
+}
+
+// Listens for messages from a user and broadcasts them to their room
+func listenForMessages(user *models.User, room *models.Room) {
+	for {
+		_, msg, err := user.Conn.ReadMessage()
+		if err != nil {
+			fmt.Println("[DISCONNECT] User disconnected:", user.ID, "Error:", err)
+			removeUserFromRoom(user.ID)
+			break
+		}
+
+		fmt.Println("[MESSAGE RECEIVED] From:", user.ID, "Message:", string(msg))
+		broadcastMessage(room, user.ID, msg)
+	}
 }
 
 // Broadcasts messages within a room
@@ -109,7 +114,7 @@ func broadcastMessage(room *models.Room, senderID string, msg []byte) {
 		"sender":  senderID,
 		"message": string(msg),
 	}
-	
+
 	jsonMsg, _ := json.Marshal(messageData)
 
 	for _, user := range room.Users {
@@ -130,11 +135,22 @@ func removeUserFromRoom(userID string) {
 	for roomID, room := range lobby.Rooms {
 		if _, exists := room.Users[userID]; exists {
 			delete(room.Users, userID)
-			fmt.Println("User", userID, "left room", roomID)
+			fmt.Println("[USER LEFT] User", userID, "left room", roomID)
+
+			// Notify the other user in the room
+			for _, remainingUser := range room.Users {
+				disconnectMsg := map[string]string{
+					"sender":  "Server",
+					"message": "The other user has disconnected. You are now alone in the room.",
+				}
+				jsonMsg, _ := json.Marshal(disconnectMsg)
+				remainingUser.Conn.WriteMessage(websocket.TextMessage, jsonMsg)
+			}
 
 			// Remove empty rooms
 			if len(room.Users) == 0 {
 				delete(lobby.Rooms, roomID)
+				fmt.Println("[ROOM DELETED] Empty room", roomID, "removed")
 			}
 			break
 		}

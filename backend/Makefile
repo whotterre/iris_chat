@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-LOCALPATH := backend/cmd
+LOCALPATH := cmd
 
 run:
 	cd $(LOCALPATH) && go run main.go
