@@ -1,50 +1,67 @@
 document.addEventListener("DOMContentLoaded", () => {
-    // Connect to the WebSocket server
+    // Connect to WebSocket
     const sockConn = new WebSocket("ws://localhost:4000/ws");
 
     // DOM elements
-    const messageInput = document.querySelector("#message_form"); // Input field for the message
-    const submitBtn = document.querySelector("#submit_btn");   // Form element
+    const messageInput = document.querySelector("#message_form"); // Make sure this ID matches your HTML
+    const submitBtn = document.querySelector("#submit_btn");
     const leaveBtn = document.querySelector("#leave_btn");
-    const messageBoard = document.querySelector("#messageboard")
+    const messageBoard = document.querySelector("#messageboard");
+
     // Function to send a message
     function sendMessage(event) {
         event.preventDefault();
-        const audioSound = new Audio("./assets/chat_sound.mp3")
-        audioSound.play()
-        const message = messageInput.value.trim(); // Get the message from the input field
-        if (message !== "") {
-            // Send the message as a JSON object
 
-            sockConn.send(message);
+        const audioSound = new Audio("./assets/chat_sound.mp3");
+        audioSound.play();
+
+        const message = messageInput.value.trim();
+        if (message !== "") {
+            const messageData = { message: message };
+            sockConn.send(JSON.stringify(messageData));
+
+            // Generate timestamp
+            const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+
+            // Display message in chat
             const messageDisplay = document.createElement("div");
-            messageDisplay.textContent = `[You]: ${message}`;
+            // messageDisplay.classList.add("message", "sent");
+            messageDisplay.innerHTML =
+
+                `
+<div class="chat-message sent">
+    <span class="message-text"><strong>You:</strong> ${message}</span>
+    <span class="timestamp">${timestamp}</span>
+</div>
+`;
+
+
             messageBoard.appendChild(messageDisplay);
-            // Clear the input field
+            messageBoard.scrollTop = messageBoard.scrollHeight;
+
+            // Clear input field
             messageInput.value = "";
         }
     }
 
-
     function toggleButton(event) {
         event.preventDefault();
-
         submitBtn.classList.toggle("hidden");
         leaveBtn.classList.toggle("hidden");
     }
 
-
     function leaveRoom(event) {
-        event.preventDefault()
-        sockConn.send("User left the room. Repairing you....")
-        sockConn.send(JSON.stringify({ type: "leave" }));
+        event.preventDefault();
+        sockConn.send(JSON.stringify({ type: "leave", message: "User left the room." }));
         sockConn.close();
     }
-    // Event listener for the submit button
+
+    // Event listeners
     submitBtn.addEventListener("click", sendMessage);
-    submitBtn.addEventListener("dblclick", toggleButton)
-    leaveBtn.addEventListener("click", leaveRoom)
-    leaveBtn.addEventListener("dblclick", toggleButton)
+    submitBtn.addEventListener("dblclick", toggleButton);
+    leaveBtn.addEventListener("click", leaveRoom);
+    leaveBtn.addEventListener("dblclick", toggleButton);
+
     // WebSocket event listeners
     sockConn.onopen = () => {
         console.log("WebSocket connection established.");
@@ -53,38 +70,47 @@ document.addEventListener("DOMContentLoaded", () => {
     sockConn.onmessage = (event) => {
         try {
             const messageObj = JSON.parse(event.data);
+
+            const receivedMessage = messageObj.message?.trim() || "No message content";
+
             if (Notification.permission === "granted") {
-                const notif = new Notification("Iris Chat", {
-                    body: `Received message: ${messageObj.message || "New Message"}`
-                });
+                new Notification("Iris Chat", { body: `Received message: ${receivedMessage}` });
             } else if (Notification.permission !== "denied") {
                 Notification.requestPermission().then(permission => {
                     if (permission === "granted") {
-                        const notif = new Notification("Iris Chat", {
-                            body: `Received message: ${messageObj.message || "New Message"}`
-                        });
+                        new Notification("Iris Chat", { body: `Received message: ${receivedMessage}` });
                     }
                 });
             }
 
+            // Generate timestamp
+            const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+
+            // Display message in chat
             const messageDisplay = document.createElement("div");
-            messageDisplay.textContent = `[${messageObj.sender || "Unknown"}]: ${messageObj.message || "No message content"}`;
+            // messageDisplay.classList.add("message", "received");
+            messageDisplay.innerHTML = `
+            <div class="chat-message recieved">
+            <span class="message-text"><strong>You:</strong> ${receivedMessage}</span>
+            <span class="timestamp">${timestamp}</span>
+            </div> `
+
+
             messageBoard.appendChild(messageDisplay);
+            messageBoard.scrollTop = messageBoard.scrollHeight;
         } catch (e) {
             console.error("Failed to parse message:", event.data);
-            const errorDisplay = document.createElement("div");
-            errorDisplay.textContent = "Error: Failed to parse incoming message.";
-            messageBoard.appendChild(errorDisplay);
         }
     };
 
+
     sockConn.onclose = (event) => {
-        console.log(event)
-        alert("WebSocket closed:", event.type, event.reason);
+        console.log("WebSocket closed:", event);
+        alert("WebSocket connection closed.");
     };
 
-
     sockConn.onerror = (error) => {
-        alert("WebSocket error:", error);
+        console.error("WebSocket error:", error);
+        alert("WebSocket encountered an error.");
     };
 });

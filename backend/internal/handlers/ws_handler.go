@@ -122,15 +122,21 @@ func broadcastMessage(room *models.Room, senderID string, msg []byte) {
 	lobby.Mutex.Lock()
 	defer lobby.Mutex.Unlock()
 
+	var parsedMsg map[string]string
+	if err := json.Unmarshal(msg, &parsedMsg); err != nil {
+		fmt.Println("[ERROR] Failed to parse incoming message:", err)
+		return
+	}
+
 	messageData := map[string]string{
 		"sender":  senderID,
-		"message": string(msg),
+		"message": parsedMsg["message"],
 	}
 
 	jsonMsg, _ := json.Marshal(messageData)
 
 	for _, user := range room.Users {
-		if user.ID != senderID { // Don't send the message back to the sender
+		if user.ID != senderID { 
 			err := user.Conn.WriteMessage(websocket.TextMessage, jsonMsg)
 			if err != nil {
 				fmt.Println("[ERROR] Failed to send message to user:", user.ID, err)
