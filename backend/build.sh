@@ -6,5 +6,3 @@ set -e
 cd cmd
 
 go mod tidy
-
-go build . -o iris_backend
