@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
     // Connect to WebSocket
-    const sockConn = new WebSocket("ws://localhost:4000/ws");
+    const sockConn = new WebSocket("https://iris-chat-900j.onrender.com/ws");
 
     // DOM elements
     const messageInput = document.querySelector("#message_form"); // Make sure this ID matches your HTML
