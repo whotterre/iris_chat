@@ -1,12 +1,22 @@
 document.addEventListener("DOMContentLoaded", () => {
     // Connect to WebSocket
-    const sockConn = new WebSocket("https://iris-chat-900j.onrender.com/ws");
+    const sockConn = new WebSocket("http://localhost:4000/ws");
 
     // DOM elements
-    const messageInput = document.querySelector("#message_form"); // Make sure this ID matches your HTML
+    const messageInput = document.querySelector("#message_form");
     const submitBtn = document.querySelector("#submit_btn");
     const leaveBtn = document.querySelector("#leave_btn");
     const messageBoard = document.querySelector("#messageboard");
+    let connectionCountDisplay = document.getElementById("connection_count");
+    if (!connectionCountDisplay) {
+        connectionCountDisplay = document.createElement("div");
+        connectionCountDisplay.id = "connection_count";
+    connectionCountDisplay.style.margin = "10px 0";
+    connectionCountDisplay.style.color = " #9b5de5;"
+    connectionCountDisplay.style.fontWeight = "bold";
+    connectionCountDisplay.style.textAlign = "right";
+    messageBoard.parentNode.insertBefore(connectionCountDisplay, messageBoard);
+    }
 
     // Function to send a message
     function sendMessage(event) {
@@ -70,6 +80,12 @@ document.addEventListener("DOMContentLoaded", () => {
     sockConn.onmessage = (event) => {
         try {
             const messageObj = JSON.parse(event.data);
+            console.log("WebSocket message received:", messageObj);
+            // Handle connection count message
+            if (messageObj.type === "connections" && messageObj.hasOwnProperty('count')) {
+                connectionCountDisplay.innerHTML = `<span class="count-number">${messageObj.count}</span><span class="count-label"> online now</span>`;
+                return;
+            }
 
             const receivedMessage = messageObj.message?.trim() || "No message content";
 
@@ -95,7 +111,6 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="timestamp">${timestamp}</span>
             </div> `
 
-
             messageBoard.appendChild(messageDisplay);
             messageBoard.scrollTop = messageBoard.scrollHeight;
         } catch (e) {
@@ -106,11 +121,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     sockConn.onclose = (event) => {
         console.log("WebSocket closed:", event);
-        alert("WebSocket connection closed.");
     };
 
     sockConn.onerror = (error) => {
         console.error("WebSocket error:", error);
-        alert("WebSocket encountered an error.");
     };
 });

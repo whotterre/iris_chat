@@ -1,3 +1,21 @@
+/* Connection Count Styling */
+#connection_count {
+    text-align: right;
+    margin: 10px 0;
+    font-size: 1.1rem;
+}
+
+#connection_count .count-number {
+    color: #9b5de5;
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+#connection_count .count-label {
+    color: #fff;
+    font-weight: lighter !important;
+    margin-left: 4px;
+}
 * {
     margin: 0;
     padding: 0;
