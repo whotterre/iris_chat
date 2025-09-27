@@ -3,7 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 
 	"irischat/backend/internal/models"
@@ -33,12 +36,56 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Generate a unique user ID
 	userID := uuid.New().String()
+	// Get the user's IP address
+	ip := r.RemoteAddr
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		// X-Forwarded-For can be a comma-separated list, take the first
+		ip = forwarded
+		if comma := strings.Index(ip, ","); comma != -1 {
+			ip = ip[:comma]
+		}
+	}
+	// Remove port if present (for both IPv4 and IPv6)
+	ipOnly := ip
+	if host, _, err := net.SplitHostPort(ip); err == nil {
+		ipOnly = host
+	}
+	// Check for duplicate IP in waiting list or rooms
+	lobby.Mutex.Lock()
+	for _, u := range lobby.WaitingUsers {
+		if u.IP == ipOnly {
+			lobby.Mutex.Unlock()
+			msg := map[string]string{
+				"sender":  "Server",
+				"message": "You are already connected from this IP. Try closing the other tab you opened it and refreshing...",
+			}
+			jsonMsg, _ := json.Marshal(msg)
+			conn.WriteMessage(websocket.TextMessage, jsonMsg)
+			conn.Close()
+			return
+		}
+	}
+	for _, room := range lobby.Rooms {
+		for _, u := range room.Users {
+			if u.IP == ipOnly {
+				lobby.Mutex.Unlock()
+				msg := map[string]string{
+				"sender":  "Server",
+				"message": "You are already connected from this IP. Try closing the other tab you opened it and refreshing...",
+			}
+				jsonMsg, _ := json.Marshal(msg)
+				conn.WriteMessage(websocket.TextMessage, jsonMsg)
+				conn.Close()
+				return
+			}
+		}
+	}
 	user := &models.User{
 		ID:   userID,
 		Conn: conn,
+		IP:   ipOnly,
 	}
-
-	lobby.Mutex.Lock()
+	log.Println(user.IP)
 	lobby.WaitingUsers = append(lobby.WaitingUsers, user)
 	room := assignRoom()
 	lobby.Mutex.Unlock()
@@ -70,22 +117,32 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 // Assigns users to a room or creates a new one
 func assignRoom() *models.Room {
 	if len(lobby.WaitingUsers) >= 2 {
-		player1 := lobby.WaitingUsers[0]
-		player2 := lobby.WaitingUsers[1]
-		roomID := "Room-" + uuid.New().String()
-
-		room := &models.Room{
-			ID:    roomID,
-			Users: map[string]*models.User{player1.ID: player1, player2.ID: player2},
+		// Try to find two users with different IPs
+		for i := 0; i < len(lobby.WaitingUsers); i++ {
+			for j := i + 1; j < len(lobby.WaitingUsers); j++ {
+				if lobby.WaitingUsers[i].IP != lobby.WaitingUsers[j].IP {
+					player1 := lobby.WaitingUsers[i]
+					player2 := lobby.WaitingUsers[j]
+					roomID := "Room-" + uuid.New().String()
+					room := &models.Room{
+						ID:    roomID,
+						Users: map[string]*models.User{player1.ID: player1, player2.ID: player2},
+					}
+					lobby.Rooms[roomID] = room
+					// Remove matched users from WaitingUsers
+					if j > i {
+						lobby.WaitingUsers = append(lobby.WaitingUsers[:j], lobby.WaitingUsers[j+1:]...)
+						lobby.WaitingUsers = append(lobby.WaitingUsers[:i], lobby.WaitingUsers[i+1:]...)
+					} else {
+						lobby.WaitingUsers = append(lobby.WaitingUsers[:i], lobby.WaitingUsers[i+1:]...)
+						lobby.WaitingUsers = append(lobby.WaitingUsers[:j], lobby.WaitingUsers[j+1:]...)
+					}
+					fmt.Println("[ROOM CREATED]", roomID)
+					return room
+				}
+			}
 		}
-
-		lobby.Rooms[roomID] = room
-		lobby.WaitingUsers = lobby.WaitingUsers[2:]
-
-		fmt.Println("[ROOM CREATED]", roomID)
-		return room
 	}
-
 	// No available pair yet, user must wait
 	return &models.Room{ID: "waiting"}
 }
@@ -99,7 +156,7 @@ func listenForMessages(user *models.User, room *models.Room) {
 			removeUserFromRoom(user.ID)
 			break
 		}
-		
+
 		var messageData map[string]string
 		if err := json.Unmarshal(msg, &messageData); err != nil {
 			fmt.Println("[ERROR] Failed to parse message:", err)
@@ -136,7 +193,7 @@ func broadcastMessage(room *models.Room, senderID string, msg []byte) {
 	jsonMsg, _ := json.Marshal(messageData)
 
 	for _, user := range room.Users {
-		if user.ID != senderID { 
+		if user.ID != senderID {
 			err := user.Conn.WriteMessage(websocket.TextMessage, jsonMsg)
 			if err != nil {
 				fmt.Println("[ERROR] Failed to send message to user:", user.ID, err)
