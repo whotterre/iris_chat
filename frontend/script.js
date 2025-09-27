@@ -91,7 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // messageDisplay.classList.add("message", "received");
             messageDisplay.innerHTML = `
             <div class="chat-message recieved">
-            <span class="message-text"><strong>You:</strong> ${receivedMessage}</span>
+            <span class="message-text"><strong>Stranger:</strong> ${receivedMessage}</span>
             <span class="timestamp">${timestamp}</span>
             </div> `
 
