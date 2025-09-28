@@ -36,28 +36,13 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Generate a unique user ID
 	userID := uuid.New().String()
-	// Get the user's IP address
-	ip := r.RemoteAddr
-	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-		// X-Forwarded-For can be a comma-separated list, take the first
-		ip = forwarded
-		if comma := strings.Index(ip, ","); comma != -1 {
-			ip = ip[:comma]
-		}
-	}
-	// Remove port if present (for both IPv4 and IPv6)
-	ipOnly := ip
-	if host, _, err := net.SplitHostPort(ip); err == nil {
-		ipOnly = host
-	}
-	// No duplicate IP disconnect logic; allow all to join lobby
-	lobby.Mutex.Lock()
+	// Get session_id from query
+	sessionID := r.URL.Query().Get("session_id")
 	user := &models.User{
-		ID:   userID,
-		Conn: conn,
-		IP:   ipOnly,
+		ID:        userID,
+		Conn:      conn,
+		SessionID: sessionID,
 	}
-	log.Println(user.IP)
 	lobby.WaitingUsers = append(lobby.WaitingUsers, user)
 	// Count all users in waiting and in rooms
 	totalConnections := len(lobby.WaitingUsers)
@@ -113,10 +98,10 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 // Assigns users to a room or creates a new one
 func assignRoom() *models.Room {
 	if len(lobby.WaitingUsers) >= 2 {
-		// Try to find two users with different IPs
+		// Try to find two users with different session IDs
 		for i := 0; i < len(lobby.WaitingUsers); i++ {
 			for j := i + 1; j < len(lobby.WaitingUsers); j++ {
-				if lobby.WaitingUsers[i].IP != lobby.WaitingUsers[j].IP {
+				if lobby.WaitingUsers[i].SessionID != "" && lobby.WaitingUsers[j].SessionID != "" && lobby.WaitingUsers[i].SessionID != lobby.WaitingUsers[j].SessionID {
 					player1 := lobby.WaitingUsers[i]
 					player2 := lobby.WaitingUsers[j]
 					roomID := "Room-" + uuid.New().String()
