@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("iris_chat_session_id", sessionId);
     }
     // Connect to WebSocket with sessionId as a query parameter
-    const sockConn = new WebSocket(`http://localhost:4000/ws?session_id=${sessionId}`);
+    const sockConn = new WebSocket(`ws://localhost:4000/ws?session_id=${sessionId}`);
 
     // DOM elements
     const messageInput = document.querySelector("#message_form");
