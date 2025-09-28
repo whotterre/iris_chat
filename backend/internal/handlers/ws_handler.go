@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
-	"strings"
 	"sync"
 
 	"irischat/backend/internal/models"
