@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"irischat/backend/internal/models"
 
@@ -51,59 +50,8 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	if host, _, err := net.SplitHostPort(ip); err == nil {
 		ipOnly = host
 	}
-	// Check for duplicate IP in waiting list or rooms
+	// No duplicate IP disconnect logic; allow all to join lobby
 	lobby.Mutex.Lock()
-	   // Prepare connection count message
-		totalConnections := len(lobby.WaitingUsers)
-	   for _, room := range lobby.Rooms {
-		   totalConnections += len(room.Users)
-	   }
-		connectionMsg := map[string]string{
-		   "sender":  "Server",
-		   "type":    "connections",
-		   "message": fmt.Sprintf("Total active connections: %d", totalConnections),
-		   "count":   fmt.Sprintf("%d", totalConnections),
-	   }
-		jsonConnMsg, _ := json.Marshal(connectionMsg)
-	   for _, u := range lobby.WaitingUsers {
-		   if u.IP == ipOnly {
-			   conn.WriteMessage(websocket.TextMessage, jsonConnMsg)
-			   lobby.Mutex.Unlock()
-			   msg := map[string]string{
-				   "sender":  "Server",
-				   "message": "You are already connected from this IP. Try closing the other tab you opened it and refreshing...",
-			   }
-			   jsonMsg, _ := json.Marshal(msg)
-			   conn.WriteMessage(websocket.TextMessage, jsonMsg)
-			   // Add a short delay to allow client to process messages
-			   go func(c *websocket.Conn) {
-				   // 100ms delay
-				   <-time.After(100 * time.Millisecond)
-				   c.Close()
-			   }(conn)
-			   return
-		   }
-	   }
-	   for _, room := range lobby.Rooms {
-		   for _, u := range room.Users {
-			   if u.IP == ipOnly {
-				   conn.WriteMessage(websocket.TextMessage, jsonConnMsg)
-				   lobby.Mutex.Unlock()
-				   msg := map[string]string{
-					   "sender":  "Server",
-					   "message": "You are already connected from this IP. Try closing the other tab you opened it and refreshing...",
-				   }
-				   jsonMsg, _ := json.Marshal(msg)
-				   conn.WriteMessage(websocket.TextMessage, jsonMsg)
-				   // Add a short delay to allow client to process messages
-				   go func(c *websocket.Conn) {
-					   <-time.After(100 * time.Millisecond)
-					   c.Close()
-				   }(conn)
-				   return
-			   }
-		   }
-	   }
 	user := &models.User{
 		ID:   userID,
 		Conn: conn,
@@ -112,19 +60,19 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	log.Println(user.IP)
 	lobby.WaitingUsers = append(lobby.WaitingUsers, user)
 	// Count all users in waiting and in rooms
-	   totalConnections = len(lobby.WaitingUsers)
-	   for _, room := range lobby.Rooms {
-		   totalConnections += len(room.Users)
-	   }
-	   log.Printf("[CONNECTIONS] Total active connections: %d\n", totalConnections)
-	   // Broadcast connection count to all users (waiting and in rooms)
-	   connectionMsg = map[string]string{
-		   "sender":  "Server",
-		   "type":    "connections",
-		   "message": fmt.Sprintf("Total active connections: %d", totalConnections),
-		   "count":   fmt.Sprintf("%d", totalConnections),
-	   }
-	   jsonConnMsg, _ = json.Marshal(connectionMsg)
+	totalConnections := len(lobby.WaitingUsers)
+	for _, room := range lobby.Rooms {
+		totalConnections += len(room.Users)
+	}
+	log.Printf("[CONNECTIONS] Total active connections: %d\n", totalConnections)
+	// Broadcast connection count to all users (waiting and in rooms)
+	connectionMsg := map[string]string{
+		"sender":  "Server",
+		"type":    "connections",
+		"message": fmt.Sprintf("Total active connections: %d", totalConnections),
+		"count":   fmt.Sprintf("%d", totalConnections),
+	}
+	jsonConnMsg, _ := json.Marshal(connectionMsg)
 	// Send to waiting users
 	for _, u := range lobby.WaitingUsers {
 		u.Conn.WriteMessage(websocket.TextMessage, jsonConnMsg)
