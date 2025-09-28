@@ -3,7 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 
 	"irischat/backend/internal/models"
@@ -40,9 +43,31 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		Conn:      conn,
 		SessionID: sessionID,
 	}
-
-	lobby.Mutex.Lock()
 	lobby.WaitingUsers = append(lobby.WaitingUsers, user)
+	// Count all users in waiting and in rooms
+	totalConnections := len(lobby.WaitingUsers)
+	for _, room := range lobby.Rooms {
+		totalConnections += len(room.Users)
+	}
+	log.Printf("[CONNECTIONS] Total active connections: %d\n", totalConnections)
+	// Broadcast connection count to all users (waiting and in rooms)
+	connectionMsg := map[string]string{
+		"sender":  "Server",
+		"type":    "connections",
+		"message": fmt.Sprintf("Total active connections: %d", totalConnections),
+		"count":   fmt.Sprintf("%d", totalConnections),
+	}
+	jsonConnMsg, _ := json.Marshal(connectionMsg)
+	// Send to waiting users
+	for _, u := range lobby.WaitingUsers {
+		u.Conn.WriteMessage(websocket.TextMessage, jsonConnMsg)
+	}
+	// Send to users in rooms
+	for _, room := range lobby.Rooms {
+		for _, u := range room.Users {
+			u.Conn.WriteMessage(websocket.TextMessage, jsonConnMsg)
+		}
+	}
 	room := assignRoom()
 	lobby.Mutex.Unlock()
 

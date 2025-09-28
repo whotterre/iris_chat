@@ -5,8 +5,9 @@ document.addEventListener("DOMContentLoaded", () => {
         sessionId = crypto.randomUUID();
         localStorage.setItem("iris_chat_session_id", sessionId);
     }
-    // Connect to WebSocket with sessionId as a query parameter
-    const sockConn = new WebSocket(`ws://localhost:4000/ws?session_id=${sessionId}`);
+    // Connect to WebSocket
+    const sockConn = new WebSocket("https://iris-chat-900j.onrender.com/ws");
+
 
     // DOM elements
     const messageInput = document.querySelector("#message_form");
