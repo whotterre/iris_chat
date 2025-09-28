@@ -6,4 +6,5 @@ import "github.com/gorilla/websocket"
  type User struct {
 	ID   string          // Unique identifier for the user
 	Conn *websocket.Conn // WebSocket connection
+	IP string
 }
