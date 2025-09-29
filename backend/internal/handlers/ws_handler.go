@@ -41,6 +41,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		Conn:      conn,
 		SessionID: sessionID,
 	}
+	lobby.Mutex.Lock()
 	lobby.WaitingUsers = append(lobby.WaitingUsers, user)
 	// Count all users in waiting and in rooms
 	totalConnections := len(lobby.WaitingUsers)
