@@ -1,8 +1,17 @@
 document.addEventListener("DOMContentLoaded", () => {
+    function generateRandomID(){
+        let result = ""
+        const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        for (let i = 0; i < 40; i++){
+            let currIdx = Math.floor(Math.random() * 62)
+            i > 0 && i % 9 == 0 ? result += "-" : result += charset[currIdx] 
+        }
+        return result
+    }
     // Generate or retrieve a unique session ID for this browser
     let sessionId = localStorage.getItem("iris_chat_session_id");
     if (!sessionId) {
-        sessionId = crypto.randomUUID();
+        sessionId = generateRandomID();
         localStorage.setItem("iris_chat_session_id", sessionId);
     }
     // Connect to WebSocket
