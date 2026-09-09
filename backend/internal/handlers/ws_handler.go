@@ -6,11 +6,19 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"irischat/backend/internal/models"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+)
+
+const (
+	writeWait      = 10 * time.Second
+	pongWait       = 60 * time.Second
+	pingPeriod     = (pongWait * 9) / 10
+	maxMessageSize = 512 * 1024
 )
 
 var (
@@ -24,190 +32,330 @@ var (
 	}
 )
 
-// HandleWebSocket manages user connections, room creation, and messaging
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		log.Printf("WebSocket upgrade failed: %v", err)
 		http.Error(w, "Failed to upgrade connection", http.StatusInternalServerError)
 		return
 	}
 
-	// Generate a unique user ID
 	userID := uuid.New().String()
-	// Get session_id from query
 	sessionID := r.URL.Query().Get("session_id")
+	if sessionID == "" {
+		sessionID = userID
+	}
+
 	user := &models.User{
 		ID:        userID,
 		Conn:      conn,
 		SessionID: sessionID,
 	}
+
+	log.Printf("User connected: %s (Session: %s)", userID, sessionID)
+
 	lobby.Mutex.Lock()
 	lobby.WaitingUsers = append(lobby.WaitingUsers, user)
-	// Count all users in waiting and in rooms
-	totalConnections := len(lobby.WaitingUsers)
-	for _, room := range lobby.Rooms {
-		totalConnections += len(room.Users)
-	}
-	log.Printf("[CONNECTIONS] Total active connections: %d\n", totalConnections)
-	// Broadcast connection count to all users (waiting and in rooms)
-	connectionMsg := map[string]string{
-		"sender":  "Server",
-		"type":    "connections",
-		"message": fmt.Sprintf("Total active connections: %d", totalConnections),
-		"count":   fmt.Sprintf("%d", totalConnections),
-	}
-	jsonConnMsg, _ := json.Marshal(connectionMsg)
-	// Send to waiting users
-	for _, u := range lobby.WaitingUsers {
-		u.Conn.WriteMessage(websocket.TextMessage, jsonConnMsg)
-	}
-	// Send to users in rooms
-	for _, room := range lobby.Rooms {
-		for _, u := range room.Users {
-			u.Conn.WriteMessage(websocket.TextMessage, jsonConnMsg)
-		}
-	}
-	room := assignRoom()
+	tryMatchmakingUnlocked()
 	lobby.Mutex.Unlock()
 
-	// Notify the user of their status
-	if room == nil || room.ID == "waiting" {
-		initialMsg := map[string]string{
+	lobby.BroadcastConnectionCount()
+	sendUserStatus(user)
+
+	go pingLoop(user)
+	go readLoop(user)
+}
+
+func sendUserStatus(user *models.User) {
+	lobby.Mutex.Lock()
+	defer lobby.Mutex.Unlock()
+
+	room := findUserRoomUnlocked(user.ID)
+	if room != nil {
+		_ = user.WriteJSON(map[string]string{
 			"sender":  "Server",
-			"message": "Waiting for another user...",
-		}
-		jsonMsg, _ := json.Marshal(initialMsg)
-		conn.WriteMessage(websocket.TextMessage, jsonMsg)
+			"type":    "status",
+			"status":  "connected",
+			"message": fmt.Sprintf("Connected to room %s", room.ID),
+			"room_id": room.ID,
+		})
 	} else {
-		// Notify both users in the room
-		for _, u := range room.Users {
-			msg := map[string]string{
-				"sender":  "Server",
-				"message": fmt.Sprintf("Connected to room %s", room.ID),
-			}
-			jsonMsg, _ := json.Marshal(msg)
-			u.Conn.WriteMessage(websocket.TextMessage, jsonMsg)
+		_ = user.WriteJSON(map[string]string{
+			"sender":  "Server",
+			"type":    "status",
+			"status":  "waiting",
+			"message": "Waiting for partner...",
+		})
+	}
+}
 
-			// Start listening for messages from each user in their own goroutine
-			go listenForMessages(u, room)
+func pingLoop(user *models.User) {
+	ticker := time.NewTicker(pingPeriod)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if err := user.WriteTextMessage([]byte{}); err != nil {
+			return
 		}
 	}
 }
 
-// Assigns users to a room or creates a new one
-func assignRoom() *models.Room {
-	if len(lobby.WaitingUsers) >= 2 {
-		// Try to find two users with different session IDs
-		for i := 0; i < len(lobby.WaitingUsers); i++ {
-			for j := i + 1; j < len(lobby.WaitingUsers); j++ {
-				if lobby.WaitingUsers[i].SessionID != "" && lobby.WaitingUsers[j].SessionID != "" && lobby.WaitingUsers[i].SessionID != lobby.WaitingUsers[j].SessionID {
-					player1 := lobby.WaitingUsers[i]
-					player2 := lobby.WaitingUsers[j]
-					roomID := "Room-" + uuid.New().String()
-					room := &models.Room{
-						ID:    roomID,
-						Users: map[string]*models.User{player1.ID: player1, player2.ID: player2},
-					}
-					lobby.Rooms[roomID] = room
-					// Remove matched users from WaitingUsers
-					if j > i {
-						lobby.WaitingUsers = append(lobby.WaitingUsers[:j], lobby.WaitingUsers[j+1:]...)
-						lobby.WaitingUsers = append(lobby.WaitingUsers[:i], lobby.WaitingUsers[i+1:]...)
-					} else {
-						lobby.WaitingUsers = append(lobby.WaitingUsers[:i], lobby.WaitingUsers[i+1:]...)
-						lobby.WaitingUsers = append(lobby.WaitingUsers[:j], lobby.WaitingUsers[j+1:]...)
-					}
-					fmt.Println("[ROOM CREATED]", roomID)
-					return room
-				}
-			}
-		}
-	}
-	// No available pair yet, user must wait
-	return &models.Room{ID: "waiting"}
-}
+func readLoop(user *models.User) {
+	defer cleanupUser(user.ID)
 
-// Listens for messages from a user and broadcasts them to their room
-func listenForMessages(user *models.User, room *models.Room) {
+	user.Conn.SetReadLimit(maxMessageSize)
+	_ = user.Conn.SetReadDeadline(time.Now().Add(pongWait))
+	user.Conn.SetPongHandler(func(string) error {
+		_ = user.Conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
 	for {
 		_, msg, err := user.Conn.ReadMessage()
 		if err != nil {
-			fmt.Println("[DISCONNECT] User disconnected:", user.ID, "Error:", err)
-			removeUserFromRoom(user.ID)
+			log.Printf("User %s disconnect: %v", user.ID, err)
 			break
 		}
+
+		_ = user.Conn.SetReadDeadline(time.Now().Add(pongWait))
 
 		var messageData map[string]string
 		if err := json.Unmarshal(msg, &messageData); err != nil {
-			fmt.Println("[ERROR] Failed to parse message:", err)
+			log.Printf("Failed to parse message from %s: %v", user.ID, err)
 			continue
 		}
 
-		if messageData["type"] == "leave" {
-			removeUserFromRoom(user.ID)
-			user.Conn.Close()
-			break
-		}
+		switch messageData["type"] {
+		case "leave":
+			return
 
-		fmt.Println("[MESSAGE RECEIVED] From:", user.ID, "Message:", string(msg))
-		broadcastMessage(room, user.ID, msg)
+		case "find_next":
+			handleFindNext(user)
+
+		case "typing":
+			handleTyping(user, messageData["is_typing"])
+
+		default:
+			handleChatMessage(user, messageData["message"])
+		}
 	}
 }
 
-// Broadcasts messages within a room
-func broadcastMessage(room *models.Room, senderID string, msg []byte) {
+func handleTyping(user *models.User, isTyping string) {
 	lobby.Mutex.Lock()
 	defer lobby.Mutex.Unlock()
 
-	var parsedMsg map[string]string
-	if err := json.Unmarshal(msg, &parsedMsg); err != nil {
-		fmt.Println("[ERROR] Failed to parse incoming message:", err)
+	room := findUserRoomUnlocked(user.ID)
+	if room == nil {
 		return
 	}
 
-	messageData := map[string]string{
-		"sender":  senderID,
-		"message": parsedMsg["message"],
+	payload := map[string]string{
+		"sender":    user.ID,
+		"type":      "typing",
+		"is_typing": isTyping,
 	}
 
-	jsonMsg, _ := json.Marshal(messageData)
-
-	for _, user := range room.Users {
-		if user.ID != senderID {
-			err := user.Conn.WriteMessage(websocket.TextMessage, jsonMsg)
-			if err != nil {
-				fmt.Println("[ERROR] Failed to send message to user:", user.ID, err)
-			}
+	for partnerID, partner := range room.Users {
+		if partnerID != user.ID {
+			go partner.WriteJSON(payload)
 		}
 	}
 }
 
-// Removes a user when they disconnect
-func removeUserFromRoom(userID string) {
+func handleChatMessage(user *models.User, content string) {
+	if content == "" {
+		return
+	}
+
 	lobby.Mutex.Lock()
-	defer lobby.Mutex.Unlock()
+	room := findUserRoomUnlocked(user.ID)
+	if room == nil {
+		lobby.Mutex.Unlock()
+		_ = user.WriteJSON(map[string]string{
+			"sender":  "Server",
+			"type":    "error",
+			"message": "Not connected to a room.",
+		})
+		return
+	}
 
+	payload := map[string]string{
+		"sender":    user.ID,
+		"type":      "chat",
+		"message":   content,
+		"timestamp": time.Now().Format("15:04"),
+	}
+
+	for partnerID, partner := range room.Users {
+		if partnerID != user.ID {
+			go partner.WriteJSON(payload)
+		}
+	}
+	lobby.Mutex.Unlock()
+}
+
+func handleFindNext(user *models.User) {
+	lobby.Mutex.Lock()
+
+	room := findUserRoomUnlocked(user.ID)
+	if room != nil {
+		delete(room.Users, user.ID)
+
+		for partnerID, partner := range room.Users {
+			go partner.WriteJSON(map[string]string{
+				"sender":  "Server",
+				"type":    "partner_left",
+				"message": "Stranger has left. Searching for a new match...",
+			})
+			delete(room.Users, partnerID)
+			lobby.WaitingUsers = append(lobby.WaitingUsers, partner)
+			go partner.WriteJSON(map[string]string{
+				"sender":  "Server",
+				"type":    "status",
+				"status":  "waiting",
+				"message": "Waiting for partner...",
+			})
+		}
+
+		if len(room.Users) == 0 {
+			delete(lobby.Rooms, room.ID)
+		}
+	}
+
+	alreadyWaiting := false
+	for _, u := range lobby.WaitingUsers {
+		if u.ID == user.ID {
+			alreadyWaiting = true
+			break
+		}
+	}
+	if !alreadyWaiting {
+		lobby.WaitingUsers = append(lobby.WaitingUsers, user)
+	}
+
+	tryMatchmakingUnlocked()
+	lobby.Mutex.Unlock()
+
+	lobby.BroadcastConnectionCount()
+	sendUserStatus(user)
+}
+
+func cleanupUser(userID string) {
+	lobby.Mutex.Lock()
+
+	removedFromWaiting := lobby.RemoveWaitingUserUnlocked(userID)
+
+	var affectedPartner *models.User
 	for roomID, room := range lobby.Rooms {
-		if _, exists := room.Users[userID]; exists {
+		if user, exists := room.Users[userID]; exists {
+			user.Close()
 			delete(room.Users, userID)
-			fmt.Println("[USER LEFT] User", userID, "left room", roomID)
 
-			// Notify the other user in the room
-			for _, remainingUser := range room.Users {
-				disconnectMsg := map[string]string{
-					"sender":  "Server",
-					"message": "The other user has disconnected. You are now alone in the room.",
-				}
-				jsonMsg, _ := json.Marshal(disconnectMsg)
-				remainingUser.Conn.WriteMessage(websocket.TextMessage, jsonMsg)
+			for partnerID, partner := range room.Users {
+				affectedPartner = partner
+				delete(room.Users, partnerID)
+				lobby.WaitingUsers = append(lobby.WaitingUsers, partner)
 			}
 
-			// Remove empty rooms
 			if len(room.Users) == 0 {
 				delete(lobby.Rooms, roomID)
-				fmt.Println("[ROOM DELETED] Empty room", roomID, "removed")
 			}
 			break
 		}
 	}
+
+	if removedFromWaiting {
+		log.Printf("Removed user %s from waiting list", userID)
+	}
+
+	if affectedPartner != nil {
+		tryMatchmakingUnlocked()
+	}
+
+	lobby.Mutex.Unlock()
+
+	if affectedPartner != nil {
+		go affectedPartner.WriteJSON(map[string]string{
+			"sender":  "Server",
+			"type":    "partner_left",
+			"message": "Stranger disconnected. Searching for a new match...",
+		})
+		sendUserStatus(affectedPartner)
+	}
+
+	lobby.BroadcastConnectionCount()
+}
+
+func tryMatchmakingUnlocked() {
+	if len(lobby.WaitingUsers) < 2 {
+		return
+	}
+
+	i := 0
+	for i < len(lobby.WaitingUsers) {
+		matched := false
+		for j := i + 1; j < len(lobby.WaitingUsers); j++ {
+			u1 := lobby.WaitingUsers[i]
+			u2 := lobby.WaitingUsers[j]
+
+			if u1.SessionID != u2.SessionID || u1.ID != u2.ID {
+				roomID := "Room-" + uuid.New().String()
+				room := &models.Room{
+					ID:    roomID,
+					Users: map[string]*models.User{u1.ID: u1, u2.ID: u2},
+				}
+				lobby.Rooms[roomID] = room
+
+				lobby.WaitingUsers = append(lobby.WaitingUsers[:j], lobby.WaitingUsers[j+1:]...)
+				lobby.WaitingUsers = append(lobby.WaitingUsers[:i], lobby.WaitingUsers[i+1:]...)
+
+				log.Printf("Matched room %s: %s & %s", roomID, u1.ID, u2.ID)
+
+				msg := map[string]string{
+					"sender":  "Server",
+					"type":    "status",
+					"status":  "connected",
+					"message": fmt.Sprintf("Connected to room %s", roomID),
+					"room_id": roomID,
+				}
+				go u1.WriteJSON(msg)
+				go u2.WriteJSON(msg)
+
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			i++
+		}
+	}
+}
+
+func findUserRoomUnlocked(userID string) *models.Room {
+	for _, room := range lobby.Rooms {
+		if _, exists := room.Users[userID]; exists {
+			return room
+		}
+	}
+	return nil
+}
+
+func HandleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "service": "iris-chat"})
+}
+
+func HandleStats(w http.ResponseWriter, r *http.Request) {
+	lobby.Mutex.Lock()
+	defer lobby.Mutex.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"active_connections": lobby.GetTotalConnectionsUnlocked(),
+		"waiting_users":      len(lobby.WaitingUsers),
+		"active_rooms":        len(lobby.Rooms),
+	})
 }
