@@ -121,7 +121,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ---
 
-Made with ❤️ by [Iwegbu Jeddy](https://github.com/your-username)
+
 ```
 
 ---
