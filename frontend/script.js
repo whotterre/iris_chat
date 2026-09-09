@@ -78,7 +78,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // Hardcode your deployed backend WebSocket URL here if hosting frontend separately (e.g. on Render)
+    // Example: const BACKEND_WS_URL = "wss://irischat.pxxlspace.cv/ws";
+    const BACKEND_WS_URL = "";
+
     function getWebSocketURL() {
+        if (BACKEND_WS_URL && BACKEND_WS_URL.trim() !== "") {
+            const separator = BACKEND_WS_URL.includes("?") ? "&" : "?";
+            return `${BACKEND_WS_URL}${separator}session_id=${encodeURIComponent(sessionId)}`;
+        }
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const host = window.location.host || "localhost:4000";
         return `${protocol}//${host}/ws?session_id=${encodeURIComponent(sessionId)}`;
