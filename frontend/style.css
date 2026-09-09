@@ -1,3 +1,17 @@
+:root {
+    --bg-dark: #050608;
+    --text-primary: #f8fafc;
+    --text-muted: #64748b;
+    
+    --aura-sent: rgba(168, 85, 247, 0.8);
+    --aura-sent-soft: rgba(192, 132, 252, 0.25);
+    
+    --aura-recv: rgba(45, 212, 191, 0.8);
+    --aura-recv-soft: rgba(20, 184, 166, 0.25);
+    
+    --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -5,179 +19,379 @@
 }
 
 body {
-    background: #1a1a2e; /* Deep Dark Blue */
-    color: #e0e0e0; /* Light Gray for Contrast */
-    font-family: 'Poppins', sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Ambient Shifting Mesh Background */
+.ambient-mesh {
+    position: absolute;
+    inset: 0;
+    background: 
+        radial-gradient(circle at 20% 20%, rgba(168, 85, 247, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(45, 212, 191, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.8) 0%, transparent 100%);
+    z-index: 0;
+    transition: background 2s ease;
+    animation: auraMeshShift 25s ease-in-out infinite alternate;
+}
+
+@keyframes auraMeshShift {
+    0% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.1) rotate(3deg); }
+    100% { transform: scale(1) rotate(-3deg); }
+}
+
+/* Main Container */
+.aura-app {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 780px;
+    height: 92vh;
+    max-height: 860px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    height: 100vh;
-    padding: 20px;
+    padding: 24px;
 }
 
-/* Message Board */
-#messageboard {
-    max-width: 100%;
-    max-width: 600px;
-    height: 70vh;
-    background: #22223b;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-}
-
-.chat-message {
+/* Header */
+.aura-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px;
-    margin: 5px 0;
-    border-radius: 8px;
-    max-width: 70%;
-    word-wrap: break-word;
-    background:olive;
-    align-self: flex-end;
-    float:right;
-    text-align: right; 
-    border-radius: 20px 0px 20px 20px;
+    padding-bottom: 16px;
 }
 
-.sent {
-    background-color: #9b5de5;
-    align-self: flex-end;
-    text-align: left; 
-    float:left;
-    border-radius: 20px 20px 20px 0px;
-}
-
-
-.timestamp {
-    font-size: 12px;
-    color: white;
-    white-space: nowrap; 
-    margin-left: 10px;
-}
-
-/* Smooth Scroll */
-#messageboard::-webkit-scrollbar {
-    width: 8px;
-}
-
-#messageboard::-webkit-scrollbar-thumb {
-    background: #9b5de5;
-    border-radius: 10px;
-}
-
-#messageboard::-webkit-scrollbar-track {
-    background: #1a1a2e;
-}
-
-/* Form */
-form {
-    width: 80vw;
-    max-width: 600px;
+.brand {
     display: flex;
-    gap: 10px;
-    margin-top: 9vh;
+    align-items: baseline;
+    gap: 4px;
 }
 
-/* Input Field */
-form input {
-    flex: 1;
-    height: 3.5rem;
-    padding: 0 10px;
-    border-radius: 8px;
-    border: 2px solid #9b5de5; /* Purple Accent */
-    background: #22223b; /* Deep Blue-Gray */
+.brand-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
     color: #ffffff;
-    font-size: 1rem;
-    transition: border 0.3s ease;
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
 }
 
-form input:focus {
-    border-color: #c77dff; /* Lighter Purple */
-    outline: none;
+.brand-sub {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--aura-sent);
+    text-shadow: 0 0 10px var(--aura-sent);
 }
 
-/* Buttons */
-button {
-    height: 3.5rem;
-    width: 6rem;
+.status-aura {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+}
+
+.dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.dot-connecting, .dot-waiting {
+    background: #f59e0b;
+    box-shadow: 0 0 10px #f59e0b;
+}
+
+.dot-connected {
+    background: #2dd4bf;
+    box-shadow: 0 0 12px #2dd4bf;
+}
+
+.dot-offline {
+    background: #f87171;
+    box-shadow: 0 0 10px #f87171;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.online-pulse {
+    color: var(--text-primary);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+/* Minimal Aura Button */
+.aura-btn {
+    background: transparent;
     border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: bold;
+    color: var(--text-muted);
+    font-family: var(--font-family);
+    font-size: 0.82rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: 0.3s ease, transform 0.2s ease;
+    transition: all 0.3s ease;
+    padding: 4px 8px;
 }
 
-/* Submit Button */
-#submit_btn {
-    background: #9b5de5; /* Purple Accent */
-    color: white;
+.aura-btn:hover {
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
 }
 
-#submit_btn:hover {
-    background: #c77dff; /* Lighter Purple */
-    transform: scale(1.05);
+/* Floating Status Banner */
+.status-banner {
+    text-align: center;
+    padding: 10px 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    transition: all 0.5s ease;
 }
 
-/* Leave Button */
-#leave_btn {
-    background: #ff4f4f; /* Soft Red */
-    color: white;
+.banner-connected {
+    color: #5eead4;
+    text-shadow: 0 0 12px rgba(94, 234, 212, 0.5);
 }
 
-#leave_btn:hover {
-    background: #ff6b6b;
-    transform: scale(1.05);
+.banner-waiting {
+    color: #fcd34d;
+    text-shadow: 0 0 12px rgba(252, 211, 77, 0.4);
 }
 
-/* Hidden Class */
+.banner-offline {
+    color: #fca5a5;
+    text-shadow: 0 0 12px rgba(252, 165, 165, 0.4);
+}
+
+/* Chat Stream Area */
+.aura-stream {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    scroll-behavior: smooth;
+}
+
+.aura-stream::-webkit-scrollbar {
+    width: 3px;
+}
+.aura-stream::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+/* Pure Typography Messages with Dissipating Glow */
+.chat-message {
+    max-width: 82%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: all 1s ease;
+}
+
+.chat-message.sent {
+    align-self: flex-end;
+    align-items: flex-end;
+    text-align: right;
+}
+
+.chat-message.received {
+    align-self: flex-start;
+    align-items: flex-start;
+    text-align: left;
+}
+
+/* Message Text (Zero box containers or borders) */
+.message-text {
+    font-size: 1.05rem;
+    line-height: 1.5;
+    font-weight: 400;
+    padding: 6px 12px;
+    word-break: break-word;
+    border-radius: 12px;
+    transition: all 1.5s ease;
+}
+
+/* Fresh Sent Aura Glow */
+.sent .message-text {
+    color: #f5f3ff;
+    background: radial-gradient(ellipse at right center, var(--aura-sent-soft) 0%, transparent 80%);
+    text-shadow: 
+        0 0 12px var(--aura-sent),
+        0 0 24px var(--aura-sent-soft);
+    animation: freshAuraPulse 3s ease-in-out infinite alternate;
+}
+
+/* Fresh Received Aura Glow */
+.received .message-text {
+    color: #f0fdfa;
+    background: radial-gradient(ellipse at left center, var(--aura-recv-soft) 0%, transparent 80%);
+    text-shadow: 
+        0 0 12px var(--aura-recv),
+        0 0 24px var(--aura-recv-soft);
+    animation: freshAuraPulse 3s ease-in-out infinite alternate;
+}
+
+@keyframes freshAuraPulse {
+    0% { filter: brightness(1); }
+    100% { filter: brightness(1.25); }
+}
+
+/* Dissipating Glow Effect (As time passes, aura slowly bleeds out into dark canvas) */
+.chat-message.aged-medium .message-text {
+    text-shadow: 0 0 8px var(--aura-sent-soft);
+    opacity: 0.85;
+    animation: none;
+}
+
+.chat-message.aged-old .message-text {
+    text-shadow: none;
+    color: rgba(248, 250, 252, 0.65);
+    background: transparent;
+    opacity: 0.65;
+    animation: none;
+}
+
+/* Micro Timestamp */
+.meta-line {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    padding: 0 12px;
+    opacity: 0.6;
+}
+
+/* System Notifications */
+.system-aura {
+    align-self: center;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    padding: 6px 16px;
+    opacity: 0.75;
+}
+
+/* Typing Aura */
+.typing-aura {
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    color: #5eead4;
+    text-shadow: 0 0 10px rgba(94, 234, 212, 0.6);
+    animation: typingPulse 1.5s infinite alternate;
+}
+
+@keyframes typingPulse {
+    0% { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+
+/* Floating Input Footer */
+.aura-footer {
+    padding-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.btn-next {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.btn-next:hover {
+    color: #fcd34d;
+    text-shadow: 0 0 10px rgba(252, 211, 77, 0.6);
+}
+
+.aura-form {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.input-container {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.input-container input {
+    width: 100%;
+    height: 44px;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-family: var(--font-family);
+    font-size: 1rem;
+    padding: 0 4px;
+}
+
+.input-container input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+/* Glowing Line Under Input */
+.input-glow-line {
+    height: 1px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.15);
+    transition: all 0.4s ease;
+}
+
+.input-container input:focus + .input-glow-line {
+    background: var(--aura-sent);
+    box-shadow: 0 0 12px var(--aura-sent);
+    height: 2px;
+}
+
+.btn-send {
+    color: var(--aura-sent);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-shadow: 0 0 8px var(--aura-sent-soft);
+}
+
+.btn-send:hover {
+    color: #c084fc;
+    text-shadow: 0 0 15px var(--aura-sent);
+}
+
 .hidden {
-    display: none;
+    display: none !important;
 }
 
-/* Responsive Styles */
-@media screen and (max-width: 365px) {
-    #messageboard {
-        height: 65vh;
+/* Responsive */
+@media (max-width: 580px) {
+    .aura-app {
+        height: 100vh;
+        max-height: 100vh;
+        padding: 16px;
     }
-    
-    form {
+    .aura-footer {
         flex-direction: column;
         align-items: stretch;
-        margin-top: 5vh;
     }
-
-    form input {
-        width: 100%;
-        height: 3.2rem;
+    .btn-next {
+        text-align: left;
     }
-
-    button {
-        width: 100%;
-    }
-}
-/* Connection Count Styling */
-#connection_count {
-    text-align: right;
-    margin: 5px 0;
-    font-size: 1.1rem;
-}
-
-#connection_count .count-number {
-    color: #9b5de5;
-    font-weight: bold;
-    font-size: 1.2em;
-}
-
-#connection_count .count-label {
-    color: #fff;
-    font-weight: lighter !important;
-    margin-left: 4px;
 }
