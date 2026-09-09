@@ -79,24 +79,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Deployed backend WebSocket URL
-    const BACKEND_WS_URL = "https://irischat.pxxlspace.cv/";
+    const BACKEND_WS_URL = "ws://irischat.pxxlspace.cv/ws";
 
     function getWebSocketURL() {
-        let base = BACKEND_WS_URL.trim();
-        if (!base) {
-            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-            const host = window.location.host || "localhost:4000";
-            base = `${protocol}//${host}/ws`;
-        } else {
-            // Convert http(s) to ws(s)
-            base = base.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:");
-            // Strip trailing slash
-            base = base.replace(/\/+$/, "");
-            // Append /ws if not present
-            if (!base.endsWith("/ws")) {
-                base += "/ws";
-            }
-        }
+        const base = BACKEND_WS_URL.trim().replace(/\/+$/, "");
         return `${base}?session_id=${encodeURIComponent(sessionId)}`;
     }
 
