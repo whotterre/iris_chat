@@ -78,18 +78,26 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Hardcode your deployed backend WebSocket URL here if hosting frontend separately (e.g. on Render)
-    // Example: const BACKEND_WS_URL = "wss://irischat.pxxlspace.cv/ws";
-    const BACKEND_WS_URL = "";
+    // Deployed backend WebSocket URL
+    const BACKEND_WS_URL = "https://irischat.pxxlspace.cv/";
 
     function getWebSocketURL() {
-        if (BACKEND_WS_URL && BACKEND_WS_URL.trim() !== "") {
-            const separator = BACKEND_WS_URL.includes("?") ? "&" : "?";
-            return `${BACKEND_WS_URL}${separator}session_id=${encodeURIComponent(sessionId)}`;
+        let base = BACKEND_WS_URL.trim();
+        if (!base) {
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const host = window.location.host || "localhost:4000";
+            base = `${protocol}//${host}/ws`;
+        } else {
+            // Convert http(s) to ws(s)
+            base = base.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:");
+            // Strip trailing slash
+            base = base.replace(/\/+$/, "");
+            // Append /ws if not present
+            if (!base.endsWith("/ws")) {
+                base += "/ws";
+            }
         }
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const host = window.location.host || "localhost:4000";
-        return `${protocol}//${host}/ws?session_id=${encodeURIComponent(sessionId)}`;
+        return `${base}?session_id=${encodeURIComponent(sessionId)}`;
     }
 
     function updateStatusUI(status, message) {
