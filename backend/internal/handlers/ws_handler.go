@@ -55,6 +55,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	log.Printf("User connected: %s (Session: %s)", userID, sessionID)
 
 	lobby.Mutex.Lock()
+	evictSessionUnlocked(sessionID)
 	lobby.WaitingUsers = append(lobby.WaitingUsers, user)
 	tryMatchmakingUnlocked()
 	lobby.Mutex.Unlock()
@@ -64,6 +65,49 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	go pingLoop(user)
 	go readLoop(user)
+}
+
+// evictSessionUnlocked purges any previous stale connection for the same session ID
+func evictSessionUnlocked(sessionID string) {
+	if sessionID == "" {
+		return
+	}
+
+	// Evict from WaitingUsers
+	for i := len(lobby.WaitingUsers) - 1; i >= 0; i-- {
+		u := lobby.WaitingUsers[i]
+		if u.SessionID == sessionID {
+			log.Printf("Evicting stale waiting connection for session: %s (User ID: %s)", sessionID, u.ID)
+			u.Close()
+			lobby.WaitingUsers = append(lobby.WaitingUsers[:i], lobby.WaitingUsers[i+1:]...)
+		}
+	}
+
+	// Evict from Rooms
+	for roomID, room := range lobby.Rooms {
+		for uID, u := range room.Users {
+			if u.SessionID == sessionID {
+				log.Printf("Evicting stale room connection for session: %s (User ID: %s in Room %s)", sessionID, uID, roomID)
+				u.Close()
+				delete(room.Users, uID)
+
+				for partnerID, partner := range room.Users {
+					delete(room.Users, partnerID)
+					lobby.WaitingUsers = append(lobby.WaitingUsers, partner)
+					go partner.WriteJSON(map[string]string{
+						"sender":  "Server",
+						"type":    "partner_left",
+						"message": "Stranger reconnected. Searching for a new match...",
+					})
+				}
+
+				if len(room.Users) == 0 {
+					delete(lobby.Rooms, roomID)
+				}
+				break
+			}
+		}
+	}
 }
 
 func sendUserStatus(user *models.User) {

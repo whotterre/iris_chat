@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
     function getOrCreateSessionID() {
-        let id = localStorage.getItem("iris_chat_session_id");
+        let id = sessionStorage.getItem("iris_chat_session_id");
         if (!id) {
             const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             let res = "";
@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 res += charset[Math.floor(Math.random() * charset.length)];
             }
             id = res;
-            localStorage.setItem("iris_chat_session_id", id);
+            sessionStorage.setItem("iris_chat_session_id", id);
         }
         return id;
     }
@@ -129,8 +129,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function connectWebSocket() {
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+
         if (ws) {
+            ws.onopen = null;
+            ws.onmessage = null;
+            ws.onerror = null;
+            ws.onclose = null;
             try { ws.close(); } catch (e) {}
+            ws = null;
         }
 
         updateStatusUI("connecting", "Connecting to server...");
@@ -160,12 +170,18 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         ws.onclose = () => {
+            ws = null;
             updateStatusUI("offline", "Connection lost. Reconnecting...");
             scheduleReconnect();
         };
 
         ws.onerror = () => {
-            ws.close();
+            if (ws) {
+                ws.onclose = null;
+                try { ws.close(); } catch (e) {}
+                ws = null;
+            }
+            scheduleReconnect();
         };
     }
 
