@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iris Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <!-- Ambient Background Mesh -->
+    <div id="ambient_background" class="ambient-mesh"></div>
+
+    <div class="aura-app">
+        <!-- Floating Ambient Header -->
+        <header class="aura-header">
+            <div class="brand">
+                <span class="brand-title">iris</span>
+                <span class="brand-sub">chat</span>
+            </div>
+
+            <div class="status-aura">
+                <span id="status_dot" class="dot dot-connecting"></span>
+                <span id="status_text" class="status-label">CONNECTING</span>
+            </div>
+
+            <div class="header-right">
+                <span class="online-pulse">
+                    <span id="connection_count">0</span> online
+                </span>
+                <button id="sound_toggle_btn" class="aura-btn">sound on</button>
+            </div>
+        </header>
+
+        <!-- Ambient Status Message -->
+        <div id="status_banner" class="status-banner">
+            <span id="banner_text">Connecting to iris server...</span>
+        </div>
+
+        <!-- Chat Canvas Stream -->
+        <main id="messageboard" class="aura-stream">
+            <div class="system-aura">
+                <span>Paired channel initialized. Text aura dissipates as time passes.</span>
+            </div>
+        </main>
+
+        <!-- Typing Aura -->
+        <div id="typing_indicator" class="typing-aura hidden">
+            <span class="typing-glow">Stranger is typing...</span>
+        </div>
+
+        <!-- Floating Input Aura Footer -->
+        <footer class="aura-footer">
+            <button id="next_btn" class="aura-btn btn-next">next stranger</button>
+
+            <form id="chat_form" class="aura-form">
+                <div class="input-container">
+                    <input type="text" id="message_input" placeholder="Type a message..." autocomplete="off" maxlength="1000">
+                    <div class="input-glow-line"></div>
+                </div>
+                <button type="submit" id="submit_btn" class="aura-btn btn-send">send</button>
+            </form>
+        </footer>
+    </div>
+
+    <script src="./script.js"></script>
+</body>
+</html>
