@@ -78,10 +78,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // Deployed backend WebSocket URL
+    const BACKEND_WS_URL = "ws://irischat.pxxlspace.cv/ws";
+
     function getWebSocketURL() {
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const host = window.location.host || "localhost:4000";
-        return `${protocol}//${host}/ws?session_id=${encodeURIComponent(sessionId)}`;
+        const base = BACKEND_WS_URL.trim().replace(/\/+$/, "");
+        return `${base}?session_id=${encodeURIComponent(sessionId)}`;
     }
 
     function updateStatusUI(status, message) {
